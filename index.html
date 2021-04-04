@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style></style>
+</head>
+<body>
+<svg></svg>
+<div class="tooltip"></div>
+<script src="https://d3js.org/d3.v6.min.js"></script>
+
+<script>
+
+let width = 1000, height = 600;
+
+let svg = d3.select("svg")
+    .attr("viewBox", "0 0 " + width + " " + height)
+
+var colorScale = d3.scaleThreshold()
+    .domain([0, 100, 500, 1000, 3000, 7000, 10000, 16000])
+    .range(d3.schemeBlues[7]);
+
+// Load external data and boot
+Promise.all([d3.json("sg_geo.json"), d3.csv("population2020.csv")]).then(data => {
+
+var population2020 = data[1];
+//console.log(population2020[1]);
+var sg_geo = data[0];
+
+
+// loop to add the population value into the array of sg_geo
+for(i=0; i<population2020.length; i++){
+          // grab subzone name
+          var dataSubz = population2020[i].Subzone;
+          //console.log(dataSubz)
+
+          //grab data value, and convert from string to float
+          var dataValue = parseFloat(population2020[i].PopMale);
+          //console.log(dataValue)
+
+          //find the corresponding state inside the GeoJSON
+          for(var n = 0; n < sg_geo.features.length; n++){
+
+            // properties name gets the states name
+            var jsonSubz = sg_geo.features[n].properties.Name;
+            //console.log(jsonSubz)
+
+            // if statement to merge by name of state
+            if(dataSubz == jsonSubz){
+                //Copy the data value into the JSON
+                // basically creating a new value column in JSON data
+                sg_geo.features[n].properties.mvalue = dataValue;
+                //console.log(sg_geo.features[n].properties.value)
+                //stop looking through the JSON
+                break;
+            }
+          }
+        }
+
+console.log(sg_geo.features[4].properties.mvalue)
+
+// Map and projection
+var projection = d3.geoMercator()
+    .center([103.851959, 1.290270])
+    .fitExtent([[20, 20], [980, 580]], data[0]);
+
+let geopath = d3.geoPath().projection(projection);
+
+svg.append("g")
+    .attr("id", "districts")
+    .selectAll("path")
+    .data(sg_geo.features)
+    .enter()
+    .append("path")
+    .attr("d", geopath)
+    .on("mouseover", (event, d) => {
+        d3.select(".tooltip")
+        .text(d.properties.Name +": "+ d.properties.mvalue)
+        .style("position", "absolute")
+        .style("background", "#fff")
+        .style("left", (event.pageX) + "px")
+        .style("top", (event.pageY) + "px");
+        })
+    .on("mouseout", (event, d) => {
+        d3.select(".tooltip")
+        .text("");
+        d3.select(event.currentTarget)
+        .classed("highlight", false)
+    })
+    .attr("fill", d=> {
+        return colorScale(d.properties.mvalue);
+    })
+})
+
+
+</script>
+
+</body>
+</html>
+
+
