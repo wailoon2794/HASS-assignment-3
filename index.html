@@ -100,6 +100,7 @@ svg.append("g")
     .attr("fill", d=> {
         return colorScale(d.properties.mvalue);
     })
+    .attr("stroke", "grey");
 
     var width = 460;
     var height = 460;
