@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+      .legend {                                            
+        font-size: 12px;           
+      }                                                     
+      rect {               
+        stroke-width: 2;                                         
+      }   
+  </style>
+  <h1 style="text-align: center;">Choropleth Map of Singapore's Male Population</h1>
+</head>
+<body>
+<svg></svg>
+<div class="tooltip"></div>
+<div id="legend" style="display: inline-block"></div>
+<script src="https://d3js.org/d3.v6.min.js"></script>
+<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+
+<script>
+let width = 1000, height = 600;
+var legendRectSize = 18;                                
+var legendSpacing = 4;  
+
+let svg = d3.select("svg")
+    .attr("viewBox", "0 0 " + width + " " + height)
+
+var colorScale = d3.scaleThreshold()
+    .domain([0, 1000, 2500, 5000, 10000, 15000, 25000])
+    .range(d3.schemeBlues[7]);
+
+// Load external data and boot
+Promise.all([d3.json("sg_geo.json"), d3.csv("population2020.csv")]).then(data => {
+
+var population2020 = data[1];
+//console.log(population2020[1]);
+var sg_geo = data[0];
+
+
+// loop to add the population value into the array of sg_geo
+for(i=0; i<population2020.length; i++){
+          // grab subzone name
+          var dataSubz = population2020[i].Subzone;
+          //console.log(dataSubz)
+
+          //grab data value, and convert from string to float
+          var dataValue = parseFloat(population2020[i].PopMale);
+          //console.log(dataValue)
+
+          //find the corresponding state inside the GeoJSON
+          for(var n = 0; n < sg_geo.features.length; n++){
+
+            // properties name gets the states name
+            var jsonSubz = sg_geo.features[n].properties.Name;
+            //console.log(jsonSubz)
+
+            // if statement to merge by name of state
+            if(dataSubz == jsonSubz){
+                //Copy the data value into the JSON
+                // basically creating a new value column in JSON data
+                sg_geo.features[n].properties.mvalue = dataValue;
+                //console.log(sg_geo.features[n].properties.value)
+                //stop looking through the JSON
+                break;
+            }
+          }
+        }
+
+//console.log(sg_geo.features[4].properties.mvalue)
+
+// Map and projection
+var projection = d3.geoMercator()
+    .center([103.851959, 1.290270])
+    .fitExtent([[20, 20], [980, 580]], data[0]);
+
+let geopath = d3.geoPath().projection(projection);
+
+svg.append("g")
+    .attr("id", "districts")
+    .selectAll("path")
+    .data(sg_geo.features)
+    .enter()
+    .append("path")
+    .attr("d", geopath)
+    .classed("leaflet-interactive", true)
+    .attr("fill", d=> {return colorScale(d.properties.mvalue);})
+    .attr("stroke", "grey")
+    .on("mouseover", (event, d) => {
+        d3.select(".tooltip")
+        .text(d.properties.Name +": "+ d.properties.mvalue)
+        .style("position", "absolute")
+        .style("background", "#fff")
+        .style("left", (event.pageX + 15) + "px")
+        .style("top", (event.pageY + 15) + "px")
+        .style("z-index", "1000");
+        d3.select(event.currentTarget)
+            .attr("opacity", 0);
+        })
+    .on("mouseout", (event, d) => {
+        d3.select(".tooltip")
+        .text("");
+        d3.select(svg.selectAll("path")
+        .attr("opacity", 1));
+        d3.select(event.currentTarget)
+    });
+
+
+    var legendRectSize = 9;
+    var legendSpacing = 4;
+
+    var legend = svg.selectAll('.legend')
+        .data(colorScale.domain())
+        .enter()
+        .append('g')
+        .attr('class', 'legend')
+        .attr('transform', function(d, i) {  
+            var height = (legendRectSize + legendSpacing) + 10;  
+            var offset =  height * colorScale.domain().length / 2;  
+            var horz = (-2 * legendRectSize) + 900;  
+            var vert = (i * height - offset) + 450;  
+            return 'translate(' + horz + ',' + vert + ')'; 
+          });
+
+        legend.append('rect') 
+          .attr('width', legendRectSize) 
+          .attr('height', legendRectSize)
+          .style('fill', colorScale) 
+          .style('stroke', colorScale);
+          
+        legend.append('text')  
+          .attr('x', legendRectSize + legendSpacing) 
+          .attr('y', legendRectSize - legendSpacing) 
+          .text(function(d) { return d; });  
+
+})
+
+
+</script>
+
+</body>
+</html>
+
+
